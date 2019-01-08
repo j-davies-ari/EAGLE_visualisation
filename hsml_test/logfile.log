@@ -1,0 +1,79 @@
+
+
+Overview of function input parameters: [cMpc] where applicable 
+
+simnum: 	 L0050N0752
+snapnum: 	 28
+centre: 	 [25.0, 25.0, 25.0]
+L_x, L_y, L_z: 	 50.000000, 50.000000, 50.000000 
+
+kernel: 	 C2
+axis: 	 z
+periodic: 	 True
+npix_x,npix_y: 	 1024, 1024 
+
+saveres: 	 True
+log: 	 True
+
+
+Processed input:
+iseltW, iseltQ, simnum, snapnum, centre, L_x, L_y, L_z, npix_x, npix_y,
+False False L0050N0752 28 [25.0, 25.0, 25.0] 50.0 50.0 50.0 1024 1024 ptypeW, ionW, abundsW, quantityW, ionQ, abundsQ, quantityQ, ptypeQ, excludeSFRW, excludeSFRQ, parttype,
+basic None Pt Mass None auto Temperature None T4 T4 0
+theta, phi, psi, var, axis, log, velcut, periodic, kernel, saveres, simulation, LsinMpc, ompproj
+0.0 0.0 0.0 REFERENCE z True False True C2 True eagle True True
+
+
+trying to read data from  /hpcdata5/simulations/EAGLE/L0050N0752//REFERENCE/data/snapshot_028_z000p000/snap_028_z000p000.
+saving W result to: /hpcdata7/arijdav1/sph_images/Mass_L0050N0752_28_test3.21_C2Sm_1024pix_50.0slice_z-projection_T4EOS
+
+None
+[read_eagle_file] reading variable  PartType0/Mass
+[read_eagle_file] finished reading snapshot
+
+[read_eagle_file] reading variable  PartType0/Coordinates
+[read_eagle_file] finished reading snapshot
+
+Translating particle positions: (25.00, 25.00, 25.00) -> (25.00, 25.00, 25.00) Mpc
+[read_eagle_file] reading variable  PartType0/SmoothingLength
+[read_eagle_file] finished reading snapshot
+
+
+--- Calling findHsmlAndProject ---
+
+Total quantity W in: 5.02913e+04
+Total quantity Q in: 0.00000e+00
+Using projection file: /home/arijdav1/Dropbox/phd/Code/sph_visualisation/hsml_test/HsmlAndProject_OMP/HsmlAndProject_v3_notree_C2_perbc_omp.so 
+
+----------
+NumPart = 403918642
+P = 0x2b09a3af4010 
+Hsml = 0x2b08227a5010 
+Mass = 0x2b0882c79010 
+Quantity = 0x2b0ac4970010 
+Xmin = 0.000000, Xmax = 50.000000 
+Ymin = 0.000000, Ymax = 50.000000 
+Zmin = 0.000000, Zmax = 50.000000 
+Xpixels = 1024, Ypixels = 1024 
+DesDensNgb = 58 
+Axis1 = 0, Axis2 = 1, Axis3 = 2
+Hmax = 25.000000 
+BoxSize = 50 
+Value = 0x2b08e394e010
+ValueQuantity = 0x34ffaf0
+
+Kernel: Wendland C2
+
+projecting
+Running make_map with OpenMP on 64 cores
+
+Total time for HsmlAndProject loop execution (omp_get_wtime): 18.0086 s
+Total time for HsmlAndProject loop execution: 1137.98 s
+done
+min(Value) = 0.006208, max(Value) = 6.599274
+min(ValueQuantity) = 0.000000, max(ValueQuantity) = 0.000000
+----------
+Total quantity W in:  5.02913e+04
+Total quantity W out: 5.02926e+04
+Total quantity Q in:  0.00000e+00
+Total quantity Q out: 0.00000e+00
