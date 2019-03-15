@@ -58,6 +58,10 @@ class mergertree(object):
         else:
             return COP_branch
 
+    def group_subgroup(self):
+
+        return self.gn[self.mainbranch], self.sgn[self.mainbranch]
+
     def expansion_factors(self):
 
         return self.a_exp[self.mainbranch]
