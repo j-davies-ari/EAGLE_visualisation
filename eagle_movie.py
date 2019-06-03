@@ -99,7 +99,7 @@ class movie(object):
 
             tag = self.snaps[ts]
             snapnum = int(tag[:3])
-            a_exp = self.tree_aexp[self.snapnumbers==snapnum]
+            a_exp = np.float(self.tree_aexp[self.snapnumbers==snapnum])
             camera_position = self.camera_positions[self.snapnumbers==snapnum]
 
             gas = region(self.prop,sim=self.sim,run=self.run,tag=tag,quiet=True,ion=self.ion)
@@ -149,12 +149,21 @@ class movie(object):
 
         print 'Establishing dynamic range...'
         if self.vmax_vals == None or self.vmin_vals == None:
+            if self.prop == 'stars':
+                self.vmax_vals = [3.2,3.2,3.2,3.2,3.2]
+                self.vmin_vals = [0.,0.,0.,0.,0.]
+
             if self.prop == 'gas':
                 self.vmax_vals = [1.8, 2.2, 2.5, 1.6, 1.0]
                 self.vmin_vals = [1.0, 0.0, -0.75, -1.3, -1.5]
+
             elif self.prop == 'xrays':
                 self.vmax_vals = [30.0, 35.0, 35.0, 35.0, 32.0]
                 self.vmin_vals = [20.0, 22.5, 22.5, 22.5, 22.5]
+
+            elif self.prop == 'entropy':
+                self.vmax_vals = [-11.7, -10.8, -10.8, 35.0, 32.0]
+                self.vmin_vals = [-14.5, -14.2, -14.2, 22.5, 22.5]
 
             elif self.prop == 'ion' and self.ion == 'c4':
                 self.vmax_vals = [15., 15., 15., 15., 15.]
@@ -178,7 +187,7 @@ class movie(object):
 
         for n in tqdm(range(num_frames)):
             
-            if self.snapnumbers[n] <= start_at:
+            if self.snapnumbers[n] < start_at:
                 continue
 
             tag = self.snaps[n]
@@ -283,42 +292,21 @@ class movie(object):
 
         
 
-def main(image_property,ion=None):
-    
+def main(grnum,image_property,initial_extent=1000.,final_extent=500.,start_at=0,set_dr=False,ion=None):
 
-    mov = movie(20,image_property,'group20_zoom_movie')
+    mov = movie(grnum,image_property,'group%i_zoom_movie'%(grnum),extent=initial_extent)
     mov.get_camera_positions()
 
-    #mov.set_dynamic_range()
+    if set_dr:
+        mov.set_dynamic_range()
     #exit()
 
     mov.generate_colour_scale()
-    mov.make_movie(phi=90.,rotate_by=90.,imageonly=True)
-    mov.zoom_rotate_at_end(final_extent=1000.)
+    mov.make_movie(phi=90.,rotate_by=90.,start_at=start_at,imageonly=True)
+    mov.zoom_rotate_at_end(final_extent=final_extent)
 
 
 if __name__ == '__main__':
     #main('ion',ion='c4')
-    main('gas')
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+    main(10,'stars',initial_extent=100.,final_extent=100.,set_dr=False,start_at=544)
 

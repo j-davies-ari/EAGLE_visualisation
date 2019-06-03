@@ -179,8 +179,45 @@ class region(object): # For loading in a region around your chosen galaxy
             elif self.property == 'xrays':
                 pids = snap.read_dataset(0, 'ParticleIDs')
                 quantity = self.xrays[np.searchsorted(self.xray_pids,pids)]
+
+            elif self.property == 'entropy':
+                m_H_cgs = 1.6737e-24
+                weight = snap.read_dataset(0, 'Mass') / self.h / 1e10
+
+                temp = snap.read_dataset(0, 'Temperature')
+
+                abunds = np.zeros((len(temp),11))
+                abunds[:,0] = snap.read_dataset(0,"SmoothedElementAbundance/Hydrogen")
+                abunds[:,1] = snap.read_dataset(0,"SmoothedElementAbundance/Helium")
+                abunds[:,2] = snap.read_dataset(0,"SmoothedElementAbundance/Carbon")
+                abunds[:,3] = snap.read_dataset(0,"SmoothedElementAbundance/Nitrogen")
+                abunds[:,4] = snap.read_dataset(0,"SmoothedElementAbundance/Oxygen")
+                abunds[:,5] = snap.read_dataset(0,"SmoothedElementAbundance/Neon")
+                abunds[:,6] = snap.read_dataset(0,"SmoothedElementAbundance/Magnesium")
+                abunds[:,7] = snap.read_dataset(0,"SmoothedElementAbundance/Silicon")
+                abunds[:,8] = abunds[:,7]*0.6054160
+                abunds[:,9] = abunds[:,7]*0.0941736
+                abunds[:,10] = snap.read_dataset(0,"SmoothedElementAbundance/Iron")
+
+                atomic_numbers = np.array([1.,2.,6.,7.,8.,10.,12.,14.,16.,20.,26.])
+                Xe = np.ones(len(abunds[:,0]))
+                num_ratios = np.zeros(np.shape(abunds))
+                for col in range(len(abunds[0,:])):
+                    num_ratios[:,col] = abunds[:,col] / abunds[:,0]
+                for element in range(len(abunds[0,:])-1):
+                    Xe += num_ratios[:,element+1]*atomic_numbers[element+1]
+
+                density = snap.read_dataset(0, 'Density')
+                n_H = density * abunds[:,0]/m_H_cgs # convert into nH cm^-3
+                n_e = n_H*Xe # electron density in cm^-3
+
+
+                quantity = temp/np.power(n_e,2./3.)
+
             else:
                 raise IOError('Plot options are "gas","ion", stars" or "xrays"')
+
+
 
         if not self.quiet:
             print 'Wrapping box...'
@@ -208,8 +245,22 @@ class region(object): # For loading in a region around your chosen galaxy
         smoothing_length *= 1e3
         if not self.quiet:
             print 'Creating scene...'
-        Particles = sphviewer.Particles(pos, quantity, hsml=smoothing_length)
-        self.Scene = sphviewer.Scene(Particles)
+
+        if self.property in ['entropy',]:
+            weight = weight[posmask]
+            Particles = sphviewer.Particles(pos, weight, hsml=smoothing_length)
+            self.weightScene = sphviewer.Scene(Particles)
+            Particles = sphviewer.Particles(pos, quantity*weight, hsml=smoothing_length)
+            self.propScene = sphviewer.Scene(Particles)
+
+        else:
+
+            if pos.size == 0:
+                self.Scene = None
+
+            else:
+                Particles = sphviewer.Particles(pos, quantity, hsml=smoothing_length)
+                self.Scene = sphviewer.Scene(Particles)
 
 
     def image(self, gn, centre,  # coordinates must be in kpc!
@@ -237,6 +288,7 @@ class region(object): # For loading in a region around your chosen galaxy
               framenumber=0,
               returnarray=False):
 
+
         if os.path.exists(path) == False:
             os.makedirs(path)
 
@@ -257,6 +309,11 @@ class region(object): # For loading in a region around your chosen galaxy
                 cmap = 'afmhot'
             axlab = r'$\log\Sigma_g$ [%s]'%(mass_units)
 
+        elif self.property == 'entropy':
+            if cmap==None:
+                cmap = 'nipy_spectral'
+            axlab = r'entropy'
+
         elif self.property == 'xrays':
             if cmap==None:
                 cmap = 'inferno'
@@ -267,78 +324,125 @@ class region(object): # For loading in a region around your chosen galaxy
             axlab = r'$\log\Sigma_*$ [%s]'%(mass_units)
         else:
             raise IOError('Plot options are "gas", "stars" or "xrays"')
+     
+
+        if self.Scene is not None:
 
 
-        
-        if camera_distance == 'infinity':
-            self.Scene.update_camera(x=centre[0], y=centre[1], z=centre[2], r='infinity', t=theta, p=phi,
-                                     extent=[-extent, extent, -extent, extent], xsize=resolution, ysize=resolution)
+            if camera_distance == 'infinity':
+
+                if self.property in ['entropy',]:
+                    self.weightScene.update_camera(x=centre[0], y=centre[1], z=centre[2], r='infinity', t=theta, p=phi,
+                                         extent=[-extent, extent, -extent, extent], xsize=resolution, ysize=resolution)
+                    self.propScene.update_camera(x=centre[0], y=centre[1], z=centre[2], r='infinity', t=theta, p=phi,
+                                         extent=[-extent, extent, -extent, extent], xsize=resolution, ysize=resolution)
+
+                else:
+                    self.Scene.update_camera(x=centre[0], y=centre[1], z=centre[2], r='infinity', t=theta, p=phi,
+                                         extent=[-extent, extent, -extent, extent], xsize=resolution, ysize=resolution)
+
+
+
+            else:
+                self.Scene.update_camera(x=x, y=y, z=z, r=camera_distance, t=theta, p=phi,
+                                         xsize=resolution, ysize=resolution)
+            
+            if not self.quiet:
+                print 'Rendering image...'
+
+            if self.property in ['entropy',]:
+
+                Render = sphviewer.Render(self.propScene)
+                propRender = Render.get_image()
+                Render = sphviewer.Render(self.weightScene)
+                weightRender = Render.get_image()
+
+                rendered_img = propRender/weightRender # weighted mean of property in each pixel
+
+                # fig,ax  = plt.subplots(1,figsize=(1,1))
+                # plt.tick_params(axis='x',which='both',bottom='off',top='off')
+                # plt.tick_params(axis='y',which='both',left='off',right='off')
+                # im1 = ax.imshow(np.log10(rendered_img), cmap=cmap, origin='lower')
+                # divider = make_axes_locatable(ax)
+                # cax = divider.append_axes("right", size="5%", pad=0.15)
+                # col = plt.colorbar(im1, cax=cax)
+                # plt.show()
+
+                # return
+
+            else:
+                Render = sphviewer.Render(self.Scene)
+                rendered_img = Render.get_image()
+
+            extent = Render.get_extent()
+
+
+            if returnarray == True:
+                # Return the raw array in crazy altered by 1e20 or 1e30 units, not sure if other codes depend on this
+                return rendered_img 
+
+            img = deepcopy(rendered_img)
+            img[img==0.] = 1e-10
+            img = np.log10(img)
+
+            if self.property == 'xrays':
+                img += 30.
+
+            if self.property == 'gas':
+                img += 20.
+
+            if self.property not in ['entropy',]:
+                img -= np.log10(px_size ** 2)
+
+
+            if camera_distance == 'infinity':
+                # If you don't know the dynamic range, set the defaults and make them callable
+                if set_contrast:
+                    if self.property == 'stars':
+                        self.vmin = -1.5
+                    elif self.property == 'gas':
+                        self.vmin = -1.5
+                    elif self.property == 'xrays':
+                        self.vmin = 22.5
+
+                    self.vmax = np.amax(img[np.isfinite(img)])
+
+                    if self.property == 'entropy':
+                        self.vmin = np.amin(img[np.isfinite(img)])
+                        self.vmax = np.amax(img[np.isfinite(img)])
+
+                elif not set_contrast and vmax==None or vmin==None:
+                    print 'Please use set_contrast or specify a vmax and vmin'
+                    exit()
+
+            else:
+                if set_contrast:
+                    minim = np.amin(img[np.isfinite(img)])
+                    maxim = np.amax(img[np.isfinite(img)])
+                    self.vmax = maxim
+                    
+                    if self.property == 'stars':
+                        self.vmin = np.percentile(np.linspace(minim,maxim,100),72)
+                    elif self.property == 'gas':
+                        self.vmin = np.percentile(np.linspace(minim,maxim,100),25)
+                    elif self.property == 'xrays':
+                        self.vmin = 22.5
+
+                elif not set_contrast and vmax==None or vmin==None:
+                    print 'Please use set_contrast or specify a vmax and vmin'
+                    exit()
+
+            if vmax == None:
+                vmax = self.vmax
+            if vmin == None:
+                vmin = self.vmin
+
 
         else:
-            self.Scene.update_camera(x=x, y=y, z=z, r=camera_distance, t=theta, p=phi,
-                                     xsize=resolution, ysize=resolution)
-        
-        if not self.quiet:
-            print 'Rendering image...'
-        Render = sphviewer.Render(self.Scene)
-        extent = Render.get_extent()
-        rendered_img = Render.get_image()
+            img = np.full((resolution,resolution),0.)
+            vmax = 1.
+            vmin=0.
 
-
-        if returnarray == True:
-            # Return the raw array in crazy altered by 1e20 or 1e30 units, not sure if other codes depend on this
-            return rendered_img 
-
-        img = deepcopy(rendered_img)
-        img[img==0.] = 1e-10
-        img = np.log10(img)
-
-        if self.property == 'xrays':
-            img += 30.
-
-        if self.property == 'gas':
-            img += 20.
-
-        img -= np.log10(px_size ** 2)
-
-
-        if camera_distance == 'infinity':
-            # If you don't know the dynamic range, set the defaults and make them callable
-            if set_contrast:
-                if self.property == 'stars':
-                    self.vmin = -1.5
-                elif self.property == 'gas':
-                    self.vmin = -1.5
-                elif self.property == 'xrays':
-                    self.vmin = 22.5
-
-                self.vmax = np.amax(img[np.isfinite(img)])
-
-            elif not set_contrast and vmax==None or vmin==None:
-                print 'Please use set_contrast or specify a vmax and vmin'
-                exit()
-
-        else:
-            if set_contrast:
-                minim = np.amin(img[np.isfinite(img)])
-                maxim = np.amax(img[np.isfinite(img)])
-                self.vmax = maxim
-                
-                if self.property == 'stars':
-                    self.vmin = np.percentile(np.linspace(minim,maxim,100),72)
-                elif self.property == 'gas':
-                    self.vmin = np.percentile(np.linspace(minim,maxim,100),25)
-                elif self.property == 'xrays':
-                    self.vmin = 22.5
-
-            elif not set_contrast and vmax==None or vmin==None:
-                print 'Please use set_contrast or specify a vmax and vmin'
-                exit()
-
-        if vmax == None:
-            vmax = self.vmax
-        if vmin == None:
-            vmin = self.vmin
 
         if imageonly: # save the img array as a picture with no colourbars etc, at right resolution
             if fname == None:
@@ -373,7 +477,6 @@ class region(object): # For loading in a region around your chosen galaxy
                 plt.show()
             plt.close(fig)
             return
-
 
 
         fig = plt.figure()
@@ -440,7 +543,7 @@ if __name__ == '__main__':
 
     # Makes an image of the gas in a 2 Mpc wide frame around a nice spiral galaxy, group 511
 
-    gas = region('gas',sim='L0100N1504') # initialise the region with the quantity you want to image, and the simulation details
+    gas = region('entropy',sim='L0100N1504') # initialise the region with the quantity you want to image, and the simulation details
     
     centre = gas.get_xyz(511) # Get the centre(s) of potential (in kpc) of the group(s) you want - you just enter the FOF group number(s)
 
@@ -477,8 +580,10 @@ if __name__ == '__main__':
     you'll need to rescale 'extent' etc by the expansion factor. See the movie code for an example.
 
     '''
-    gas.image(511,centre,extent=2000,save=False,theta=20,phi=200,resolution=1024,showaxes=True)
+    gas.image(511,centre,extent=500.,save=False,theta=20,phi=200,resolution=1024,showaxes=True)
 
+
+    exit()
 
     '''
     Now, for fun, let's zoom way out and image the large-scale structure. All we have to do is call 'select' again and load in a much bigger chunk, then re-image.
